@@ -8,8 +8,8 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="희수 캘린더">
 <meta name="theme-color" content="#FBF8F3">
-<link rel="apple-touch-icon" href="/flat_cute_mustard.png">
-<link rel="icon" href="/flat_cute_mustard.png">
+<link rel="apple-touch-icon" href="/crayon_diary_v1_icon.png">
+<link rel="icon" href="/crayon_diary_v1_icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;650;700&display=swap" rel="stylesheet">
 <style>
@@ -82,6 +82,10 @@
   .weekday-row div{ text-align:center; font-size:11px; font-weight:650; color:var(--muted); padding:4px 0; }
   .weekday-row div:first-child{ color:var(--heesu); }
   .weekday-row div:last-child{ color:var(--bf); }
+  .carousel{ overflow:hidden; width:100%; }
+  .months-track{ display:flex; width:500%; transform:translateX(-40%); }
+  .months-track.animating{ transition:transform .30s cubic-bezier(.25,.7,.4,1); }
+  .month-panel{ flex:0 0 20%; max-width:20%; min-width:0; }
 
   .grid{ display:grid; grid-template-columns:repeat(7,1fr); grid-auto-rows:1fr; gap:3px; }
   .cell{
@@ -334,6 +338,8 @@
     return pos < act;
   }
 
+  let animating = false;
+
   function buildLayout(){
     mainContent.innerHTML =
       '<div class="month-nav">' +
@@ -346,17 +352,17 @@
       '</div>' +
       '<div class="cal-wrap" id="calWrap">' +
         '<div class="weekday-row">' + DOW.map(d=>'<div>'+d+'</div>').join('') + '</div>' +
-        '<div class="grid" id="grid"></div>' +
+        '<div class="carousel"><div class="months-track" id="track"></div></div>' +
       '</div>' +
       '<div class="agenda" id="agenda"></div>';
 
-    document.getElementById('prevBtn').onclick = ()=> navMonth(-1);
-    document.getElementById('nextBtn').onclick = ()=> navMonth(1);
+    document.getElementById('prevBtn').onclick = ()=> slideTo(-1);
+    document.getElementById('nextBtn').onclick = ()=> slideTo(1);
     document.getElementById('todayBtn').onclick = ()=>{
       refreshRealToday();
       viewYear = realTodayY; viewMonth = realTodayM;
       selectedDateIso = isoOf(realTodayY, realTodayM, realTodayD);
-      renderCalendar();
+      renderTrack();
     };
 
     const calWrap = document.getElementById('calWrap');
@@ -369,17 +375,35 @@
       const dx = e.changedTouches[0].clientX - touchStartX;
       const dy = e.changedTouches[0].clientY - touchStartY;
       if(Math.abs(dx) > 46 && Math.abs(dx) > Math.abs(dy)*1.4){
-        if(dx > 0) navMonth(1);   // 오른쪽으로 스와이프 -> 다음달
-        else navMonth(-1);        // 왼쪽으로 스와이프 -> 이전달
+        if(dx < 0) slideTo(1);   // 손가락을 왼쪽으로 밀면 -> 다음달 (오른쪽에서 슬라이드)
+        else slideTo(-1);         // 손가락을 오른쪽으로 밀면 -> 이전달 (왼쪽에서 슬라이드)
       }
     }, {passive:true});
+
+    renderTrack();
   }
 
-  function navMonth(delta){
-    viewMonth += delta;
-    if(viewMonth > 11){ viewMonth = 0; viewYear++; }
-    if(viewMonth < 0){ viewMonth = 11; viewYear--; }
-    renderCalendar();
+  function addMonths(y, m, delta){
+    let nm = m + delta;
+    let ny = y;
+    while(nm > 11){ nm -= 12; ny++; }
+    while(nm < 0){ nm += 12; ny--; }
+    return { y: ny, m: nm };
+  }
+
+  function slideTo(direction){
+    if(animating) return;
+    animating = true;
+    const track = document.getElementById('track');
+    track.classList.add('animating');
+    const targetPct = -40 + direction*(-20); // direction 1(next)->-60%, -1(prev)->-20%
+    track.style.transform = 'translateX(' + targetPct + '%)';
+    setTimeout(()=>{
+      const next = addMonths(viewYear, viewMonth, direction);
+      viewYear = next.y; viewMonth = next.m;
+      renderTrack(true);
+      animating = false;
+    }, 300);
   }
 
   function eventsFor(iso){
@@ -391,25 +415,24 @@
     });
   }
 
-  function renderCalendar(){
-    document.getElementById('monthTitle').textContent = viewYear + '년 ' + (viewMonth+1) + '월';
-    const grid = document.getElementById('grid');
-    grid.innerHTML = '';
+  function buildMonthGrid(y, m){
+    const grid = document.createElement('div');
+    grid.className = 'grid';
 
-    const firstOfMonth = new Date(viewYear, viewMonth, 1);
+    const firstOfMonth = new Date(y, m, 1);
     const startWeekday = firstOfMonth.getDay();
-    const daysInThisMonth = new Date(viewYear, viewMonth+1, 0).getDate();
-    const daysInPrevMonth = new Date(viewYear, viewMonth, 0).getDate();
+    const daysInThisMonth = new Date(y, m+1, 0).getDate();
+    const daysInPrevMonth = new Date(y, m, 0).getDate();
 
     const cells = [];
     for(let i=0;i<startWeekday;i++){
       const dnum = daysInPrevMonth - startWeekday + 1 + i;
-      const y = viewMonth===0 ? viewYear-1 : viewYear;
-      const m = viewMonth===0 ? 11 : viewMonth-1;
-      cells.push({ y, m, d:dnum, outside:true });
+      const py = m===0 ? y-1 : y;
+      const pm = m===0 ? 11 : m-1;
+      cells.push({ y:py, m:pm, d:dnum, outside:true });
     }
     for(let d=1; d<=daysInThisMonth; d++){
-      cells.push({ y:viewYear, m:viewMonth, d, outside:false });
+      cells.push({ y, m, d, outside:false });
     }
     while(cells.length % 7 !== 0 || cells.length < 42){
       const last = cells[cells.length-1];
@@ -452,12 +475,30 @@
         cell.appendChild(dotsWrap);
       }
 
-      cell.onclick = ()=>{ selectedDateIso = iso; renderCalendar(); };
+      cell.onclick = ()=>{ selectedDateIso = iso; renderTrack(); };
       grid.appendChild(cell);
     });
 
+    return grid;
+  }
+
+  function renderTrack(skipTransitionReset){
+    document.getElementById('monthTitle').textContent = viewYear + '년 ' + (viewMonth+1) + '월';
+    const track = document.getElementById('track');
+    track.classList.remove('animating');
+    track.innerHTML = '';
+    for(let off=-2; off<=2; off++){
+      const mm = addMonths(viewYear, viewMonth, off);
+      const panel = document.createElement('div');
+      panel.className = 'month-panel';
+      panel.appendChild(buildMonthGrid(mm.y, mm.m));
+      track.appendChild(panel);
+    }
+    // snap instantly back to the centered (index 2) position, no animation
+    track.style.transform = 'translateX(-40%)';
     renderAgenda();
   }
+  const renderCalendar = renderTrack;
 
   function renderAgenda(){
     const agenda = document.getElementById('agenda');
