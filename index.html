@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>희수 캘린더</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="희수 캘린더">
+<meta name="theme-color" content="#FBF8F3">
+<link rel="apple-touch-icon" href="/crayon_diary_v1_icon.png">
+<link rel="icon" href="/crayon_diary_v1_icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;650;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#FBF8F3;
+    --paper-raised:#FFFFFF;
+    --ink:#2B2A28;
+    --ink-soft:#6B6560;
+    --muted:#B3ACA3;
+    --line:#EDE6DB;
+    --heesu:#F0868F;
+    --heesu-soft:#FCE3E5;
+    --bf:#5B93C4;
+    --bf-soft:#DEEBF6;
+    --pill:#B48FCB;
+    --pill-soft:#F0E4F6;
+    --coral:#C6564A;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--paper);
+    color:var(--ink);
+    font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;
+    min-height:100vh;
+    overscroll-behavior-y:none;
+  }
+  .app{
+    max-width:480px;
+    margin:0 auto;
+    padding:20px 16px 100px;
+    min-height:100vh;
+  }
+
+  header{ display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; }
+  h1{ font-size:19px; font-weight:700; margin:0; letter-spacing:-0.01em; }
+  .header-icons{ display:flex; gap:6px; }
+  .icon-btn{
+    width:34px; height:34px; border-radius:10px; border:1px solid var(--line);
+    background:var(--paper-raised); display:flex; align-items:center; justify-content:center;
+    cursor:pointer; font-size:16px;
+  }
+  .sync-row{ font-size:11.5px; color:var(--muted); margin-bottom:16px; display:flex; align-items:center; gap:5px; }
+  .sync-row .dot{ width:6px; height:6px; border-radius:50%; background:#7BAE8F; }
+  .sync-row.offline .dot{ background:var(--coral); }
+  .sync-row.syncing .dot{ background:var(--pill); }
+
+  .legend{ display:flex; gap:14px; font-size:11.5px; color:var(--ink-soft); margin-bottom:14px; flex-wrap:wrap; }
+  .legend span{ display:inline-flex; align-items:center; gap:5px; }
+  .legend .sw{ width:9px; height:9px; border-radius:50%; display:inline-block; }
+
+  .month-nav{
+    display:flex; align-items:center; justify-content:space-between;
+    margin-bottom:12px;
+  }
+  .month-title{ font-size:17px; font-weight:700; }
+  .nav-btns{ display:flex; gap:6px; align-items:center; }
+  .nav-btn{
+    width:32px; height:32px; border-radius:9px; border:1px solid var(--line);
+    background:var(--paper-raised); cursor:pointer; font-size:15px; color:var(--ink-soft);
+    display:flex; align-items:center; justify-content:center;
+  }
+  .today-btn{
+    font-size:12px; font-weight:650; color:var(--heesu); background:var(--heesu-soft);
+    border:none; border-radius:8px; padding:6px 10px; cursor:pointer;
+  }
+
+  .cal-wrap{ touch-action: pan-y; user-select:none; }
+  .weekday-row{ display:grid; grid-template-columns:repeat(7,1fr); margin-bottom:4px; }
+  .weekday-row div{ text-align:center; font-size:11px; font-weight:650; color:var(--muted); padding:4px 0; }
+  .weekday-row div:first-child{ color:var(--heesu); }
+  .weekday-row div:last-child{ color:var(--bf); }
+
+  .grid{ display:grid; grid-template-columns:repeat(7,1fr); grid-auto-rows:1fr; gap:3px; }
+  .cell{
+    position:relative;
+    background:var(--paper-raised);
+    border-radius:11px;
+    min-height:52px;
+    padding:5px 4px 4px;
+    cursor:pointer;
+    border:1.5px solid transparent;
+    display:flex; flex-direction:column; align-items:center;
+  }
+  .cell.outside{ opacity:0.32; }
+  .cell.today{ border-color:var(--heesu); }
+  .cell.selected{ background:var(--heesu-soft); }
+  .cell.pillday::before{
+    content:"";
+    position:absolute; top:3px; right:5px;
+    width:5px; height:5px; border-radius:50%;
+    background:var(--pill);
+  }
+  .cell .num{ font-size:12.5px; font-weight:600; }
+  .cell.sunday .num{ color:var(--heesu); }
+  .cell.saturday .num{ color:var(--bf); }
+  .dots{ display:flex; gap:2px; margin-top:3px; flex-wrap:wrap; justify-content:center; }
+  .dots .d{ width:5px; height:5px; border-radius:50%; }
+  .dots .more{ font-size:8.5px; color:var(--muted); font-weight:650; }
+
+  .agenda{ margin-top:22px; }
+  .agenda-header{ display:flex; align-items:baseline; justify-content:space-between; margin-bottom:10px; }
+  .agenda-date{ font-size:14.5px; font-weight:700; }
+  .agenda-empty{ font-size:13px; color:var(--muted); padding:18px 4px; text-align:center; }
+  .agenda-item{
+    display:flex; align-items:flex-start; gap:10px; padding:10px 2px;
+    border-bottom:1px solid var(--line);
+  }
+  .agenda-item .sw{ width:9px; height:9px; border-radius:50%; margin-top:4px; flex-shrink:0; }
+  .agenda-item .info{ flex:1; min-width:0; }
+  .agenda-item .title{ font-size:14px; font-weight:600; }
+  .agenda-item .meta{ font-size:11.5px; color:var(--muted); margin-top:2px; }
+  .agenda-item .del{
+    background:none; border:none; color:var(--muted); cursor:pointer; padding:3px; border-radius:6px;
+  }
+  .agenda-item .del:hover{ color:var(--coral); background:#FBECEA; }
+
+  .fab{
+    position:fixed; right:20px; bottom:28px;
+    width:54px; height:54px; border-radius:50%;
+    background:var(--heesu); color:#fff; font-size:26px; font-weight:400;
+    border:none; box-shadow:0 6px 16px rgba(240,134,143,0.45);
+    cursor:pointer; display:flex; align-items:center; justify-content:center;
+    line-height:1; z-index:20;
+  }
+
+  .sheet-overlay{
+    position:fixed; inset:0; background:rgba(30,26,24,0.32);
+    display:none; align-items:flex-end; justify-content:center; z-index:30;
+  }
+  .sheet-overlay.show{ display:flex; }
+  .sheet{
+    background:var(--paper); width:100%; max-width:480px;
+    border-radius:20px 20px 0 0; padding:20px 18px calc(24px + env(safe-area-inset-bottom));
+  }
+  .sheet h3{ font-size:16px; font-weight:700; margin:0 0 16px; }
+  .field-label{ font-size:12px; font-weight:650; color:var(--ink-soft); margin:14px 0 6px; }
+  .sheet input[type=text], .sheet input[type=date], .sheet input[type=time], .sheet input[type=number]{
+    width:100%; font-family:inherit; font-size:15px; font-weight:500;
+    padding:11px 12px; border:1.5px solid var(--line); border-radius:10px;
+    background:var(--paper-raised); color:var(--ink); outline:none;
+  }
+  .sheet input:focus{ border-color:var(--heesu); }
+  .toggle-row{ display:flex; gap:8px; }
+  .toggle-btn{
+    flex:1; font-family:inherit; font-size:13.5px; font-weight:650;
+    padding:10px; border-radius:10px; border:1.5px solid var(--line);
+    background:var(--paper-raised); color:var(--ink-soft); cursor:pointer;
+    display:flex; align-items:center; justify-content:center; gap:6px;
+  }
+  .toggle-btn .sw{ width:8px; height:8px; border-radius:50%; }
+  .toggle-btn.selected.heesu{ background:var(--heesu-soft); border-color:var(--heesu); color:var(--coral); }
+  .toggle-btn.selected.bf{ background:var(--bf-soft); border-color:var(--bf); color:#2E5C82; }
+  .time-toggle{ display:flex; align-items:center; gap:8px; margin-top:14px; }
+  .time-toggle label{ font-size:13px; color:var(--ink-soft); font-weight:600; }
+  .sheet-btns{ display:flex; gap:8px; margin-top:20px; }
+  .btn{
+    flex:1; font-family:inherit; font-size:14.5px; font-weight:650; padding:13px;
+    border-radius:11px; border:none; cursor:pointer;
+  }
+  .btn.primary{ background:var(--heesu); color:#fff; }
+  .btn.ghost{ background:var(--paper-raised); color:var(--ink-soft); border:1.5px solid var(--line); }
+  .btn.danger{ background:#FBECEA; color:var(--coral); }
+
+  .pill-modal .row2{ display:flex; gap:10px; }
+  .pill-modal .row2 > div{ flex:1; }
+  .pill-info{ font-size:12px; color:var(--ink-soft); background:var(--pill-soft); padding:10px 12px; border-radius:10px; margin-top:10px; line-height:1.5; }
+
+  .toast{
+    position:fixed; bottom:96px; left:50%; transform:translateX(-50%) translateY(20px);
+    background:var(--ink); color:var(--paper); font-size:13px; font-weight:500; padding:10px 16px;
+    border-radius:8px; opacity:0; pointer-events:none; transition:opacity .2s ease, transform .2s ease; z-index:40;
+  }
+  .toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
+  .loading-state{ text-align:center; padding:60px 20px; color:var(--muted); font-size:13.5px; }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>희수 캘린더</h1>
+    <div class="header-icons">
+      <button class="icon-btn" id="pillBtn" title="피임약 주기 설정">💊</button>
+    </div>
+  </header>
+  <div class="sync-row" id="syncRow"><span class="dot"></span><span id="syncLabel">동기화됨</span></div>
+  <div class="legend">
+    <span><span class="sw" style="background:var(--heesu)"></span>희수</span>
+    <span><span class="sw" style="background:var(--bf)"></span>남자친구</span>
+    <span><span class="sw" style="background:var(--pill)"></span>피임약 복용일</span>
+  </div>
+
+  <div id="mainContent"><div class="loading-state">불러오는 중…</div></div>
+</div>
+
+<button class="fab" id="fabAdd">+</button>
+
+<div class="sheet-overlay" id="addOverlay">
+  <div class="sheet">
+    <h3>일정 추가</h3>
+    <div class="field-label">날짜</div>
+    <input type="date" id="evDate">
+    <div class="time-toggle">
+      <input type="checkbox" id="evTimeToggle">
+      <label for="evTimeToggle">시간 지정</label>
+    </div>
+    <input type="time" id="evTime" style="margin-top:8px; display:none;">
+    <div class="field-label">누구 일정인가요</div>
+    <div class="toggle-row" id="personToggle">
+      <button class="toggle-btn heesu" data-person="희수"><span class="sw" style="background:var(--heesu)"></span>희수</button>
+      <button class="toggle-btn bf" data-person="남자친구"><span class="sw" style="background:var(--bf)"></span>남자친구</button>
+    </div>
+    <div class="field-label">내용</div>
+    <input type="text" id="evTitle" placeholder="예) 저녁 약속, 병원 예약">
+    <div class="sheet-btns">
+      <button class="btn ghost" id="evCancel">취소</button>
+      <button class="btn primary" id="evSave">저장</button>
+    </div>
+  </div>
+</div>
+
+<div class="sheet-overlay" id="pillOverlay">
+  <div class="sheet pill-modal">
+    <h3>💊 피임약 주기 설정</h3>
+    <div class="field-label">복용 시작일</div>
+    <input type="date" id="pillStart">
+    <div class="row2">
+      <div>
+        <div class="field-label">복용일수</div>
+        <input type="number" id="pillActive" value="21" min="1" max="90">
+      </div>
+      <div>
+        <div class="field-label">총 주기(일)</div>
+        <input type="number" id="pillCycle" value="28" min="1" max="90">
+      </div>
+    </div>
+    <div class="pill-info">시작일부터 복용일수 만큼 매 주기마다 자동으로 달력에 표시돼요. 예: 21일 복용, 28일 주기면 21일 먹고 7일 쉬는 패턴이 계속 반복돼요.</div>
+    <div class="sheet-btns">
+      <button class="btn danger" id="pillClear">끄기</button>
+      <button class="btn primary" id="pillSave">저장</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+  const API = '/api/calendar';
+  const DOW = ['일','월','화','수','목','금','토'];
+  const IDENTITY_KEY = 'heesu_cal_identity';
+
+  let data = { events: [], pill: null };
+  let viewYear, viewMonth; // month: 0-11
+  let realTodayY, realTodayM, realTodayD;
+  let selectedDateIso = null;
+  let loaded = false;
+
+  const mainContent = document.getElementById('mainContent');
+  const toastEl = document.getElementById('toast');
+  const syncRow = document.getElementById('syncRow');
+  const syncLabel = document.getElementById('syncLabel');
+
+  function pad(n){ return n<10?'0'+n:''+n; }
+  function isoOf(y,m,d){ return y+'-'+pad(m+1)+'-'+pad(d); }
+  function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+
+  function refreshRealToday(){
+    const now = new Date();
+    realTodayY = now.getFullYear(); realTodayM = now.getMonth(); realTodayD = now.getDate();
+  }
+
+  function showToast(msg){
+    toastEl.textContent = msg;
+    toastEl.classList.add('show');
+    clearTimeout(toastEl._t);
+    toastEl._t = setTimeout(()=> toastEl.classList.remove('show'), 1600);
+  }
+  function setSync(state){
+    syncRow.className = 'sync-row' + (state==='offline'?' offline':state==='syncing'?' syncing':'');
+    syncLabel.textContent = state==='offline' ? '저장 실패 · 재시도 필요' : state==='syncing' ? '저장 중…' : '동기화됨';
+  }
+
+  async function loadRemote(){
+    const res = await fetch(API, { cache:'no-store' });
+    if(!res.ok) throw new Error('load failed');
+    return res.json();
+  }
+  let saveTimer=null, saveInFlight=false, savePending=false;
+  function persist(){
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(doSave, 150);
+  }
+  async function doSave(){
+    if(saveInFlight){ savePending=true; return; }
+    saveInFlight = true;
+    setSync('syncing');
+    try{
+      const res = await fetch(API, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(data) });
+      if(!res.ok) throw new Error();
+      setSync('ok');
+    }catch(e){
+      setSync('offline');
+      showToast('저장에 실패했어요. 인터넷을 확인해주세요.');
+    }finally{
+      saveInFlight = false;
+      if(savePending){ savePending=false; doSave(); }
+    }
+  }
+
+  function personColorVar(p){ return p==='남자친구' ? 'var(--bf)' : 'var(--heesu)'; }
+
+  function isPillActiveDay(iso){
+    if(!data.pill || !data.pill.startDate) return false;
+    const start = new Date(data.pill.startDate+'T00:00:00');
+    const d = new Date(iso+'T00:00:00');
+    const diffDays = Math.floor((d - start) / 86400000);
+    if(diffDays < 0) return false;
+    const cyc = data.pill.cycleDays || 28;
+    const act = data.pill.activeDays || 21;
+    const pos = diffDays % cyc;
+    return pos < act;
+  }
+
+  function buildLayout(){
+    mainContent.innerHTML =
+      '<div class="month-nav">' +
+        '<div class="month-title" id="monthTitle"></div>' +
+        '<div class="nav-btns">' +
+          '<button class="today-btn" id="todayBtn">오늘</button>' +
+          '<button class="nav-btn" id="prevBtn">‹</button>' +
+          '<button class="nav-btn" id="nextBtn">›</button>' +
+        '</div>' +
+      '</div>' +
+      '<div class="cal-wrap" id="calWrap">' +
+        '<div class="weekday-row">' + DOW.map(d=>'<div>'+d+'</div>').join('') + '</div>' +
+        '<div class="grid" id="grid"></div>' +
+      '</div>' +
+      '<div class="agenda" id="agenda"></div>';
+
+    document.getElementById('prevBtn').onclick = ()=> navMonth(-1);
+    document.getElementById('nextBtn').onclick = ()=> navMonth(1);
+    document.getElementById('todayBtn').onclick = ()=>{
+      refreshRealToday();
+      viewYear = realTodayY; viewMonth = realTodayM;
+      selectedDateIso = isoOf(realTodayY, realTodayM, realTodayD);
+      renderCalendar();
+    };
+
+    const calWrap = document.getElementById('calWrap');
+    let touchStartX=0, touchStartY=0, touching=false;
+    calWrap.addEventListener('touchstart', e=>{
+      touchStartX = e.touches[0].clientX; touchStartY = e.touches[0].clientY; touching=true;
+    }, {passive:true});
+    calWrap.addEventListener('touchend', e=>{
+      if(!touching) return; touching=false;
+      const dx = e.changedTouches[0].clientX - touchStartX;
+      const dy = e.changedTouches[0].clientY - touchStartY;
+      if(Math.abs(dx) > 46 && Math.abs(dx) > Math.abs(dy)*1.4){
+        if(dx > 0) navMonth(1);   // 오른쪽으로 스와이프 -> 다음달
+        else navMonth(-1);        // 왼쪽으로 스와이프 -> 이전달
+      }
+    }, {passive:true});
+  }
+
+  function navMonth(delta){
+    viewMonth += delta;
+    if(viewMonth > 11){ viewMonth = 0; viewYear++; }
+    if(viewMonth < 0){ viewMonth = 11; viewYear--; }
+    renderCalendar();
+  }
+
+  function eventsFor(iso){
+    return data.events.filter(e=>e.date===iso).sort((a,b)=>{
+      if(a.time && b.time) return a.time < b.time ? -1 : 1;
+      if(a.time) return -1;
+      if(b.time) return 1;
+      return 0;
+    });
+  }
+
+  function renderCalendar(){
+    document.getElementById('monthTitle').textContent = viewYear + '년 ' + (viewMonth+1) + '월';
+    const grid = document.getElementById('grid');
+    grid.innerHTML = '';
+
+    const firstOfMonth = new Date(viewYear, viewMonth, 1);
+    const startWeekday = firstOfMonth.getDay();
+    const daysInThisMonth = new Date(viewYear, viewMonth+1, 0).getDate();
+    const daysInPrevMonth = new Date(viewYear, viewMonth, 0).getDate();
+
+    const cells = [];
+    for(let i=0;i<startWeekday;i++){
+      const dnum = daysInPrevMonth - startWeekday + 1 + i;
+      const y = viewMonth===0 ? viewYear-1 : viewYear;
+      const m = viewMonth===0 ? 11 : viewMonth-1;
+      cells.push({ y, m, d:dnum, outside:true });
+    }
+    for(let d=1; d<=daysInThisMonth; d++){
+      cells.push({ y:viewYear, m:viewMonth, d, outside:false });
+    }
+    while(cells.length % 7 !== 0 || cells.length < 42){
+      const last = cells[cells.length-1];
+      const nd = new Date(last.y, last.m, last.d+1);
+      cells.push({ y:nd.getFullYear(), m:nd.getMonth(), d:nd.getDate(), outside:true });
+    }
+
+    cells.forEach((c, idx)=>{
+      const iso = isoOf(c.y, c.m, c.d);
+      const wd = idx % 7;
+      const isToday = c.y===realTodayY && c.m===realTodayM && c.d===realTodayD;
+      const isSelected = iso === selectedDateIso;
+      const evs = eventsFor(iso);
+      const pillActive = isPillActiveDay(iso);
+
+      const cell = document.createElement('div');
+      cell.className = 'cell' +
+        (c.outside?' outside':'') +
+        (isToday?' today':'') +
+        (isSelected?' selected':'') +
+        (wd===0?' sunday':'') + (wd===6?' saturday':'') +
+        (pillActive?' pillday':'');
+      cell.innerHTML = '<span class="num">'+c.d+'</span>';
+
+      if(evs.length){
+        const dotsWrap = document.createElement('div');
+        dotsWrap.className = 'dots';
+        evs.slice(0,3).forEach(e=>{
+          const dd = document.createElement('span');
+          dd.className = 'd';
+          dd.style.background = personColorVar(e.person);
+          dotsWrap.appendChild(dd);
+        });
+        if(evs.length > 3){
+          const more = document.createElement('span');
+          more.className = 'more';
+          more.textContent = '+'+(evs.length-3);
+          dotsWrap.appendChild(more);
+        }
+        cell.appendChild(dotsWrap);
+      }
+
+      cell.onclick = ()=>{ selectedDateIso = iso; renderCalendar(); };
+      grid.appendChild(cell);
+    });
+
+    renderAgenda();
+  }
+
+  function renderAgenda(){
+    const agenda = document.getElementById('agenda');
+    if(!selectedDateIso){ agenda.innerHTML = ''; return; }
+    const d = new Date(selectedDateIso+'T00:00:00');
+    const label = (d.getMonth()+1)+'월 '+d.getDate()+'일 '+DOW[d.getDay()]+'요일';
+    const evs = eventsFor(selectedDateIso);
+    const pillActive = isPillActiveDay(selectedDateIso);
+
+    let html = '<div class="agenda-header"><div class="agenda-date">'+label+'</div></div>';
+    if(pillActive){
+      html += '<div class="agenda-item"><span class="sw" style="background:var(--pill)"></span>' +
+              '<div class="info"><div class="title">💊 피임약 복용일</div></div></div>';
+    }
+    if(evs.length===0 && !pillActive){
+      html += '<div class="agenda-empty">이 날은 일정이 없어요</div>';
+    } else {
+      evs.forEach(e=>{
+        html += '<div class="agenda-item">' +
+          '<span class="sw" style="background:'+personColorVar(e.person)+'"></span>' +
+          '<div class="info"><div class="title">'+escapeHtml(e.title)+'</div>' +
+          '<div class="meta">'+e.person + (e.time ? ' · '+e.time : '')+'</div></div>' +
+          '<button class="del" data-id="'+e.id+'">✕</button>' +
+          '</div>';
+      });
+    }
+    agenda.innerHTML = html;
+    agenda.querySelectorAll('.del').forEach(btn=>{
+      btn.onclick = ()=>{
+        data.events = data.events.filter(x=>x.id!==btn.dataset.id);
+        persist(); renderCalendar();
+      };
+    });
+  }
+
+  function escapeHtml(s){
+    return s.replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  }
+
+  /* ---------- add event sheet ---------- */
+  const addOverlay = document.getElementById('addOverlay');
+  const evDate = document.getElementById('evDate');
+  const evTimeToggle = document.getElementById('evTimeToggle');
+  const evTime = document.getElementById('evTime');
+  const evTitle = document.getElementById('evTitle');
+  const personToggle = document.getElementById('personToggle');
+  let selPerson = localStorage.getItem(IDENTITY_KEY) || '희수';
+
+  function openAddSheet(){
+    evDate.value = selectedDateIso || isoOf(realTodayY, realTodayM, realTodayD);
+    evTimeToggle.checked = false;
+    evTime.style.display = 'none';
+    evTime.value = '';
+    evTitle.value = '';
+    setPersonSelected(selPerson);
+    addOverlay.classList.add('show');
+    setTimeout(()=> evTitle.focus(), 50);
+  }
+  function closeAddSheet(){ addOverlay.classList.remove('show'); }
+
+  function setPersonSelected(p){
+    selPerson = p;
+    personToggle.querySelectorAll('.toggle-btn').forEach(b=>{
+      b.classList.toggle('selected', b.dataset.person===p);
+    });
+  }
+  personToggle.querySelectorAll('.toggle-btn').forEach(b=>{
+    b.onclick = ()=> setPersonSelected(b.dataset.person);
+  });
+  evTimeToggle.onchange = ()=>{ evTime.style.display = evTimeToggle.checked ? 'block' : 'none'; };
+
+  document.getElementById('fabAdd').onclick = openAddSheet;
+  document.getElementById('evCancel').onclick = closeAddSheet;
+  addOverlay.onclick = (e)=>{ if(e.target===addOverlay) closeAddSheet(); };
+  evTitle.addEventListener('keydown', e=>{ if(e.key==='Enter') saveEvent(); });
+
+  function saveEvent(){
+    const title = evTitle.value.trim();
+    if(!title){ evTitle.focus(); return; }
+    if(!evDate.value) return;
+    localStorage.setItem(IDENTITY_KEY, selPerson);
+    data.events.push({
+      id: uid(),
+      date: evDate.value,
+      time: evTimeToggle.checked && evTime.value ? evTime.value : null,
+      title,
+      person: selPerson,
+      createdAt: Date.now()
+    });
+    persist();
+    selectedDateIso = evDate.value;
+    closeAddSheet();
+    renderCalendar();
+  }
+  document.getElementById('evSave').onclick = saveEvent;
+
+  /* ---------- pill settings sheet ---------- */
+  const pillOverlay = document.getElementById('pillOverlay');
+  const pillStart = document.getElementById('pillStart');
+  const pillActive = document.getElementById('pillActive');
+  const pillCycle = document.getElementById('pillCycle');
+
+  document.getElementById('pillBtn').onclick = ()=>{
+    if(data.pill && data.pill.startDate){
+      pillStart.value = data.pill.startDate;
+      pillActive.value = data.pill.activeDays || 21;
+      pillCycle.value = data.pill.cycleDays || 28;
+    } else {
+      pillStart.value = isoOf(realTodayY, realTodayM, realTodayD);
+      pillActive.value = 21;
+      pillCycle.value = 28;
+    }
+    pillOverlay.classList.add('show');
+  };
+  pillOverlay.onclick = (e)=>{ if(e.target===pillOverlay) pillOverlay.classList.remove('show'); };
+  document.getElementById('pillSave').onclick = ()=>{
+    if(!pillStart.value) return;
+    data.pill = {
+      startDate: pillStart.value,
+      activeDays: parseInt(pillActive.value,10) || 21,
+      cycleDays: parseInt(pillCycle.value,10) || 28
+    };
+    persist();
+    pillOverlay.classList.remove('show');
+    renderCalendar();
+    showToast('피임약 주기를 저장했어요');
+  };
+  document.getElementById('pillClear').onclick = ()=>{
+    data.pill = null;
+    persist();
+    pillOverlay.classList.remove('show');
+    renderCalendar();
+    showToast('피임약 표시를 껐어요');
+  };
+
+  /* ---------- init & rollover ---------- */
+  async function init(){
+    refreshRealToday();
+    viewYear = realTodayY; viewMonth = realTodayM;
+    selectedDateIso = isoOf(realTodayY, realTodayM, realTodayD);
+    try{
+      data = await loadRemote();
+      if(!data.events) data.events = [];
+    }catch(e){
+      data = { events: [], pill: null };
+      setSync('offline');
+      showToast('데이터를 불러오지 못했어요. 새로고침해보세요.');
+    }
+    buildLayout();
+    renderCalendar();
+    loaded = true;
+  }
+
+  let lastRealMonthKey = null;
+  function monthKey(){ return realTodayY+'-'+realTodayM; }
+
+  setInterval(async ()=>{
+    const prevKey = monthKey();
+    refreshRealToday();
+    if(monthKey() !== prevKey){
+      // real month changed while app stayed open — follow along if user was on "today"
+      if(viewYear===parseInt(prevKey.split('-')[0]) && viewMonth===parseInt(prevKey.split('-')[1])){
+        viewYear = realTodayY; viewMonth = realTodayM;
+      }
+      renderCalendar();
+    }
+  }, 60000);
+
+  document.addEventListener('visibilitychange', async ()=>{
+    if(document.visibilityState==='visible' && loaded){
+      refreshRealToday();
+      try{ data = await loadRemote(); if(!data.events) data.events=[]; renderCalendar(); setSync('ok'); }
+      catch(e){ setSync('offline'); }
+    }
+  });
+
+  init();
+})();
+</script>
+</body>
+</html>
