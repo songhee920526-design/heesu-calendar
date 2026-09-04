@@ -3,10 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>희수 캘린더</title>
+<title>희 캘린더</title>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="희수 캘린더">
+<meta name="apple-mobile-web-app-title" content="희 캘린더">
 <meta name="theme-color" content="#FBF8F3">
 <link rel="apple-touch-icon" href="/crayon_diary_v1_icon.png">
 <link rel="icon" href="/crayon_diary_v1_icon.png">
@@ -190,15 +190,15 @@
 <body>
 <div class="app">
   <header>
-    <h1>희수 캘린더</h1>
+    <h1>희 캘린더</h1>
     <div class="header-icons">
       <button class="icon-btn" id="pillBtn" title="피임약 주기 설정">💊</button>
     </div>
   </header>
   <div class="sync-row" id="syncRow"><span class="dot"></span><span id="syncLabel">동기화됨</span></div>
   <div class="legend">
-    <span><span class="sw" style="background:var(--heesu)"></span>희수</span>
-    <span><span class="sw" style="background:var(--bf)"></span>남자친구</span>
+    <span><span class="sw" style="background:var(--heesu)"></span>희</span>
+    <span><span class="sw" style="background:var(--bf)"></span>완수</span>
     <span><span class="sw" style="background:var(--pill)"></span>피임약 복용일</span>
   </div>
 
@@ -219,8 +219,8 @@
     <input type="time" id="evTime" style="margin-top:8px; display:none;">
     <div class="field-label">누구 일정인가요</div>
     <div class="toggle-row" id="personToggle">
-      <button class="toggle-btn heesu" data-person="희수"><span class="sw" style="background:var(--heesu)"></span>희수</button>
-      <button class="toggle-btn bf" data-person="남자친구"><span class="sw" style="background:var(--bf)"></span>남자친구</button>
+      <button class="toggle-btn heesu" data-person="희"><span class="sw" style="background:var(--heesu)"></span>희</button>
+      <button class="toggle-btn bf" data-person="완수"><span class="sw" style="background:var(--bf)"></span>완수</button>
     </div>
     <div class="field-label">내용</div>
     <input type="text" id="evTitle" placeholder="예) 저녁 약속, 병원 예약">
@@ -320,7 +320,7 @@
     }
   }
 
-  function personColorVar(p){ return p==='남자친구' ? 'var(--bf)' : 'var(--heesu)'; }
+  function personColorVar(p){ return p==='완수' ? 'var(--bf)' : 'var(--heesu)'; }
 
   function isPillActiveDay(iso){
     if(!data.pill || !data.pill.startDate) return false;
@@ -504,7 +504,7 @@
   const evTime = document.getElementById('evTime');
   const evTitle = document.getElementById('evTitle');
   const personToggle = document.getElementById('personToggle');
-  let selPerson = localStorage.getItem(IDENTITY_KEY) || '희수';
+  let selPerson = localStorage.getItem(IDENTITY_KEY) || '희';
 
   function openAddSheet(){
     evDate.value = selectedDateIso || isoOf(realTodayY, realTodayM, realTodayD);
