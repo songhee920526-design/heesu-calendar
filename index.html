@@ -99,19 +99,16 @@
     display:flex; flex-direction:column; align-items:center;
   }
   .cell.outside{ opacity:0.32; }
+  .cell.pillday{ background:var(--pill-soft); }
   .cell.today{ border-color:var(--heesu); }
+  .cell.holiday{ border-color:#E24A4A; }
+  .cell.holiday .num{ color:#E24A4A; }
   .cell.selected{ background:var(--heesu-soft); }
-  .cell.pillday::before{
-    content:"";
-    position:absolute; top:3px; right:5px;
-    width:5px; height:5px; border-radius:50%;
-    background:var(--pill);
-  }
   .cell .num{ font-size:12.5px; font-weight:600; }
   .cell.sunday .num{ color:var(--heesu); }
   .cell.saturday .num{ color:var(--bf); }
-  .dots{ display:flex; gap:2px; margin-top:3px; flex-wrap:wrap; justify-content:center; }
-  .dots .d{ width:5px; height:5px; border-radius:50%; }
+  .dots{ display:flex; gap:3px; margin-top:4px; flex-wrap:wrap; justify-content:center; }
+  .dots .d{ width:8px; height:8px; border-radius:50%; }
   .dots .more{ font-size:8.5px; color:var(--muted); font-weight:650; }
 
   .agenda{ margin-top:22px; }
@@ -196,14 +193,17 @@
   <header>
     <h1>희수 캘린더</h1>
     <div class="header-icons">
-      <button class="icon-btn" id="pillBtn" title="피임약 주기 설정">💊</button>
+      <button class="icon-btn" id="pillBtn" title="피임약 주기 설정">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+          <path d="M12 20.5c-.3 0-.6-.1-.8-.3C7.9 17.6 3 13.9 3 9.6 3 6.5 5.4 4 8.4 4c1.6 0 3.1.8 4.1 2 1-1.2 2.5-2 4.1-2 3 0 5.4 2.5 5.4 5.6 0 4.3-4.9 8-8.2 10.6-.2.2-.5.3-.8.3z" fill="var(--pill)"/>
+        </svg>
+      </button>
     </div>
   </header>
   <div class="sync-row" id="syncRow"><span class="dot"></span><span id="syncLabel">동기화됨</span></div>
   <div class="legend">
     <span><span class="sw" style="background:var(--heesu)"></span>희</span>
     <span><span class="sw" style="background:var(--bf)"></span>완수</span>
-    <span><span class="sw" style="background:var(--pill)"></span>피임약 복용일</span>
   </div>
 
   <div id="mainContent"><div class="loading-state">불러오는 중…</div></div>
@@ -265,6 +265,32 @@
   const API = '/api/calendar';
   const DOW = ['일','월','화','수','목','금','토'];
   const IDENTITY_KEY = 'heesu_cal_identity';
+
+  // 한국 공휴일 (관공서의 공휴일에 관한 규정 기준, 대체공휴일 포함). 근로자의 날은 제외.
+  const KR_HOLIDAYS = new Set([
+    // 2025
+    '2025-01-01','2025-01-27','2025-01-28','2025-01-29','2025-01-30',
+    '2025-03-01','2025-03-03','2025-05-05','2025-05-06','2025-06-03',
+    '2025-06-06','2025-08-15','2025-10-03','2025-10-05','2025-10-06',
+    '2025-10-07','2025-10-08','2025-10-09','2025-12-25',
+    // 2026
+    '2026-01-01','2026-02-16','2026-02-17','2026-02-18','2026-03-01',
+    '2026-03-02','2026-05-05','2026-05-24','2026-05-25','2026-06-03',
+    '2026-06-06','2026-07-17','2026-08-15','2026-08-17','2026-09-24',
+    '2026-09-25','2026-09-26','2026-10-03','2026-10-05','2026-10-09',
+    '2026-12-25',
+    // 2027
+    '2027-01-01','2027-02-06','2027-02-07','2027-02-08','2027-02-09',
+    '2027-03-01','2027-05-05','2027-05-13','2027-06-06','2027-08-15',
+    '2027-08-16','2027-09-14','2027-09-15','2027-09-16','2027-10-03',
+    '2027-10-04','2027-10-09','2027-10-11','2027-12-25',
+    // 2028
+    '2028-01-01','2028-01-26','2028-01-27','2028-03-01','2028-05-05',
+    '2028-06-06','2028-07-17','2028-08-15','2028-10-02','2028-10-03',
+    '2028-10-04','2028-10-09','2028-12-25'
+  ]);
+  function isHoliday(iso){ return KR_HOLIDAYS.has(iso); }
+
 
   let data = { events: [], pill: null };
   let viewYear, viewMonth; // month: 0-11
@@ -447,6 +473,7 @@
       const isSelected = iso === selectedDateIso;
       const evs = eventsFor(iso);
       const pillActive = isPillActiveDay(iso);
+      const holiday = isHoliday(iso);
 
       const cell = document.createElement('div');
       cell.className = 'cell' +
@@ -454,7 +481,8 @@
         (isToday?' today':'') +
         (isSelected?' selected':'') +
         (wd===0?' sunday':'') + (wd===6?' saturday':'') +
-        (pillActive?' pillday':'');
+        (pillActive?' pillday':'') +
+        (holiday?' holiday':'');
       cell.innerHTML = '<span class="num">'+c.d+'</span>';
 
       if(evs.length){
