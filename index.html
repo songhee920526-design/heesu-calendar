@@ -27,6 +27,8 @@
     --pill:#B48FCB;
     --pill-soft:#F0E4F6;
     --coral:#C6564A;
+    --off:#4F9A63;
+    --unread:#3FAE63;
   }
   *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
   html,body{margin:0;padding:0;}
@@ -90,6 +92,7 @@
   .grid{ display:grid; grid-template-columns:repeat(7,1fr); grid-auto-rows:1fr; gap:3px; }
   .cell{
     position:relative;
+    z-index:0;
     background:var(--paper-raised);
     border-radius:11px;
     min-height:52px;
@@ -110,6 +113,20 @@
   }
   .cell.pill-start::after{ content:'★'; background:var(--pill); color:#fff; }
   .cell.rest-start::after{ content:'☾'; background:#fff; color:var(--pill); border:1.5px solid var(--pill); font-size:10px; }
+  /* 완수 휴무일: 성긴 초록 빗금 (배경 아래 레이어라 다른 표시와 안 겹침) */
+  .cell.dayoff::before{
+    content:''; position:absolute; inset:0; border-radius:inherit; z-index:-1;
+    background-image:repeating-linear-gradient(45deg, var(--off) 0 1.5px, transparent 1.5px 9px);
+    opacity:.38;
+  }
+  .cell.pick-add{ outline:2px solid var(--bf); outline-offset:-2px; }
+  .cell.pick-remove{ outline:2px dashed var(--coral); outline-offset:-2px; }
+  .cell.pick-remove::before{ opacity:.15; }
+  /* 상대가 아직 확인 안 한 일정이 있는 날 */
+  .unread-dot{
+    position:absolute; top:3px; left:3px; width:7px; height:7px; border-radius:50%;
+    background:var(--unread); box-shadow:0 0 0 1.5px var(--paper-raised);
+  }
   .cell.today{ border-color:var(--heesu); }
   .cell.holiday{ border-color:#E24A4A; }
   .cell.holiday .num{ color:#E24A4A; }
@@ -137,6 +154,27 @@
     background:none; border:none; color:var(--muted); cursor:pointer; padding:3px; border-radius:6px;
   }
   .agenda-item .del:hover{ color:var(--coral); background:#FBECEA; }
+  .confirm-check{ flex-shrink:0; display:flex; align-items:center; cursor:pointer; margin-top:2px; }
+  .confirm-check input{ display:none; }
+  .confirm-check span{
+    width:18px; height:18px; border-radius:6px; border:1.5px solid var(--line);
+    background:var(--paper-raised); display:flex; align-items:center; justify-content:center; position:relative;
+  }
+  .confirm-check input:checked + span{ background:var(--off); border-color:var(--off); }
+  .confirm-check input:checked + span::after{
+    content:''; width:9px; height:6px; border-left:2px solid #fff; border-bottom:2px solid #fff;
+    transform:rotate(-45deg) translate(1px,-1px);
+  }
+  .pick-bar{
+    display:none; align-items:center; justify-content:space-between; gap:10px;
+    background:rgba(79,154,99,0.1); border:1px solid rgba(79,154,99,0.35); color:var(--off);
+    border-radius:10px; padding:9px 12px; margin-bottom:12px; font-size:12px; font-weight:650;
+  }
+  .pick-bar.show{ display:flex; }
+  .pick-bar-btns{ display:flex; gap:6px; flex-shrink:0; }
+  .btn-sm{ font-family:inherit; font-size:12px; font-weight:650; padding:7px 12px; border-radius:8px; border:none; cursor:pointer; }
+  .btn-sm.cancel{ background:#fff; color:var(--ink-soft); border:1px solid var(--line); }
+  .btn-sm.save{ background:var(--off); color:#fff; }
 
   .fab{
     position:fixed; right:20px; bottom:28px;
@@ -203,6 +241,12 @@
   <header>
     <h1>희수 캘린더</h1>
     <div class="header-icons">
+      <button class="icon-btn" id="dayoffBtn" title="완수 휴무일 설정">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+          <rect x="3.5" y="3.5" width="17" height="17" rx="5" stroke="var(--off)" stroke-width="1.7"/>
+          <path d="M7.5 16.5l9-9M12 16.5l4.5-4.5" stroke="var(--off)" stroke-width="1.7" stroke-linecap="round"/>
+        </svg>
+      </button>
       <button class="icon-btn" id="pillBtn" title="피임약 주기 설정">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
           <path d="M12 20.5c-.3 0-.6-.1-.8-.3C7.9 17.6 3 13.9 3 9.6 3 6.5 5.4 4 8.4 4c1.6 0 3.1.8 4.1 2 1-1.2 2.5-2 4.1-2 3 0 5.4 2.5 5.4 5.6 0 4.3-4.9 8-8.2 10.6-.2.2-.5.3-.8.3z" fill="var(--pill)"/>
@@ -210,6 +254,13 @@
       </button>
     </div>
   </header>
+  <div class="pick-bar" id="pickBar">
+    <span id="pickCount">완수 휴무일 선택 중 · 0일 선택됨</span>
+    <div class="pick-bar-btns">
+      <button class="btn-sm cancel" id="pickCancel">취소</button>
+      <button class="btn-sm save" id="pickSaveBtn">저장</button>
+    </div>
+  </div>
   <div class="sync-row" id="syncRow"><span class="dot"></span><span id="syncLabel">동기화됨</span></div>
   <div class="legend">
     <span><span class="sw" style="background:var(--heesu)"></span>희</span>
@@ -302,11 +353,15 @@
   function isHoliday(iso){ return KR_HOLIDAYS.has(iso); }
 
 
-  let data = { events: [], pill: null };
+  let data = { events: [], pill: null, dayoff: [] };
   let viewYear, viewMonth; // month: 0-11
   let realTodayY, realTodayM, realTodayD;
   let selectedDateIso = null;
   let loaded = false;
+
+  // 완수 휴무일 다중 선택 모드
+  let pickMode = false;
+  let pickPending = new Map(); // iso -> 'add' | 'remove'
 
   const mainContent = document.getElementById('mainContent');
   const toastEl = document.getElementById('toast');
@@ -387,6 +442,52 @@
     if(pos === 0) return 'start';
     if(pos === act && act < cyc) return 'rest';
     return null;
+  }
+
+  function isDayOff(iso){ return !!(data.dayoff && data.dayoff.includes(iso)); }
+
+  // 상대방이 올렸는데 내가 아직 확인 안 한 일정이 그 날짜에 있는지
+  function hasUnread(iso){
+    return eventsFor(iso).some(e => e.person !== selPerson && e.confirmed === false);
+  }
+
+  function togglePick(iso){
+    const off = isDayOff(iso);
+    const cur = pickPending.get(iso);
+    if(!cur){ pickPending.set(iso, off ? 'remove' : 'add'); }
+    else { pickPending.delete(iso); }
+    updatePickBar();
+    renderTrack();
+  }
+
+  function updatePickBar(){
+    const bar = document.getElementById('pickBar');
+    if(!bar) return;
+    bar.classList.toggle('show', pickMode);
+    document.getElementById('pickCount').textContent = '완수 휴무일 선택 중 · ' + pickPending.size + '일 선택됨';
+  }
+
+  function commitPick(){
+    if(!data.dayoff) data.dayoff = [];
+    let changed = 0;
+    pickPending.forEach((action, iso)=>{
+      const idx = data.dayoff.indexOf(iso);
+      if(action==='add' && idx===-1){ data.dayoff.push(iso); changed++; }
+      else if(action==='remove' && idx!==-1){ data.dayoff.splice(idx,1); changed++; }
+    });
+    pickPending.clear();
+    pickMode = false;
+    persist();
+    updatePickBar();
+    renderTrack();
+    showToast(changed ? '완수 휴무일을 반영했어요' : '변경된 내용이 없어요');
+  }
+
+  function cancelPick(){
+    pickPending.clear();
+    pickMode = false;
+    updatePickBar();
+    renderTrack();
   }
 
   let animating = false;
@@ -500,6 +601,9 @@
       const pillActive = isPillActiveDay(iso);
       const holiday = isHoliday(iso);
       const marker = pillMarker(iso);
+      const pending = pickMode ? pickPending.get(iso) : undefined;
+      const off = isDayOff(iso) && pending !== 'remove';
+      const unread = hasUnread(iso);
 
       const cell = document.createElement('div');
       cell.className = 'cell' +
@@ -510,8 +614,18 @@
         (pillActive?' pillday':'') +
         (marker==='start'?' pill-start':'') +
         (marker==='rest'?' rest-start':'') +
-        (holiday?' holiday':'');
+        (holiday?' holiday':'') +
+        (off?' dayoff':'') +
+        (pending==='add'?' pick-add':'') +
+        (pending==='remove'?' pick-remove':'');
       cell.innerHTML = '<span class="num">'+c.d+'</span>';
+
+      if(unread){
+        const ud = document.createElement('span');
+        ud.className = 'unread-dot';
+        ud.title = '아직 확인 안 한 일정이 있어요';
+        cell.appendChild(ud);
+      }
 
       if(evs.length){
         const dotsWrap = document.createElement('div');
@@ -531,7 +645,10 @@
         cell.appendChild(dotsWrap);
       }
 
-      cell.onclick = ()=>{ selectedDateIso = iso; renderTrack(); };
+      cell.onclick = ()=>{
+        if(pickMode){ togglePick(iso); return; }
+        selectedDateIso = iso; renderTrack();
+      };
       grid.appendChild(cell);
     });
 
@@ -572,6 +689,9 @@
           '<span class="sw" style="background:'+personColorVar(e.person)+'"></span>' +
           '<div class="info"><div class="title">'+escapeHtml(e.title)+'</div>' +
           '<div class="meta">'+e.person + (e.time ? ' · '+e.time : '')+'</div></div>' +
+          '<label class="confirm-check" title="상대가 확인했어요">' +
+            '<input type="checkbox" data-id="'+e.id+'" '+(e.confirmed?'checked':'')+'><span></span>' +
+          '</label>' +
           '<button class="del" data-id="'+e.id+'">✕</button>' +
           '</div>';
       });
@@ -580,6 +700,14 @@
     agenda.querySelectorAll('.del').forEach(btn=>{
       btn.onclick = ()=>{
         data.events = data.events.filter(x=>x.id!==btn.dataset.id);
+        persist(); renderCalendar();
+      };
+    });
+    agenda.querySelectorAll('.confirm-check input').forEach(cb=>{
+      cb.onchange = ()=>{
+        const ev = data.events.find(x=>x.id===cb.dataset.id);
+        if(!ev) return;
+        ev.confirmed = cb.checked;
         persist(); renderCalendar();
       };
     });
@@ -637,7 +765,8 @@
       time: evTimeToggle.checked && evTime.value ? evTime.value : null,
       title,
       person: selPerson,
-      createdAt: Date.now()
+      createdAt: Date.now(),
+      confirmed: false
     });
     persist();
     selectedDateIso = evDate.value;
@@ -685,6 +814,17 @@
     showToast('피임약 표시를 껐어요');
   };
 
+  /* ---------- 완수 휴무일 다중 선택 ---------- */
+  document.getElementById('dayoffBtn').onclick = ()=>{
+    pickMode = !pickMode;
+    if(!pickMode) pickPending.clear();
+    updatePickBar();
+    renderTrack();
+    if(pickMode) showToast('날짜를 여러 개 눌러서 고른 뒤 저장하세요');
+  };
+  document.getElementById('pickCancel').onclick = cancelPick;
+  document.getElementById('pickSaveBtn').onclick = commitPick;
+
   /* ---------- init & rollover ---------- */
   async function init(){
     refreshRealToday();
@@ -693,8 +833,9 @@
     try{
       data = await loadRemote();
       if(!data.events) data.events = [];
+      if(!data.dayoff) data.dayoff = [];
     }catch(e){
-      data = { events: [], pill: null };
+      data = { events: [], pill: null, dayoff: [] };
       setSync('offline');
       showToast('데이터를 불러오지 못했어요. 새로고침해보세요.');
     }
@@ -721,7 +862,7 @@
   document.addEventListener('visibilitychange', async ()=>{
     if(document.visibilityState==='visible' && loaded){
       refreshRealToday();
-      try{ data = await loadRemote(); if(!data.events) data.events=[]; renderCalendar(); setSync('ok'); }
+      try{ data = await loadRemote(); if(!data.events) data.events=[]; if(!data.dayoff) data.dayoff=[]; renderCalendar(); setSync('ok'); }
       catch(e){ setSync('offline'); }
     }
   });
