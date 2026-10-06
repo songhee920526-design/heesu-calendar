@@ -446,9 +446,9 @@
 
   function isDayOff(iso){ return !!(data.dayoff && data.dayoff.includes(iso)); }
 
-  // 상대방이 올렸는데 내가 아직 확인 안 한 일정이 그 날짜에 있는지
+  // 아직 체크(확인) 안 한 일정이 그 날짜에 있는지 — 누가 올렸든 상관없이 둘 다 똑같이 봄
   function hasUnread(iso){
-    return eventsFor(iso).some(e => e.person !== selPerson && e.confirmed === false);
+    return eventsFor(iso).some(e => e.confirmed === false);
   }
 
   function togglePick(iso){
