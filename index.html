@@ -393,8 +393,9 @@
     if(!res.ok) throw new Error('load failed');
     return res.json();
   }
-  let saveTimer=null, saveInFlight=false, savePending=false;
+  let saveTimer=null, saveInFlight=false, savePending=false, unsaved=false;
   function persist(){
+    unsaved = true;
     clearTimeout(saveTimer);
     saveTimer = setTimeout(doSave, 150);
   }
@@ -405,6 +406,7 @@
     try{
       const res = await fetch(API, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(data) });
       if(!res.ok) throw new Error();
+      unsaved = false;
       setSync('ok');
     }catch(e){
       setSync('offline');
@@ -413,6 +415,25 @@
       saveInFlight = false;
       if(savePending){ savePending=false; doSave(); }
     }
+  }
+
+  // 앱을 빠르게 벗어날 때(화면 끄기/다른 앱 전환/탭 닫기) 대기 중이던 저장이 끊기지 않도록
+  // sendBeacon으로 즉시 보냄. fetch와 달리 페이지가 사라져도 브라우저가 전송을 보장해줌.
+  function flushSaveBeacon(){
+    if(!unsaved && saveTimer==null) return;
+    clearTimeout(saveTimer); saveTimer=null;
+    const body = JSON.stringify(data);
+    let sent = false;
+    try{
+      if(navigator.sendBeacon){
+        const blob = new Blob([body], { type:'application/json' });
+        sent = navigator.sendBeacon(API, blob);
+      }
+    }catch(e){ sent = false; }
+    if(!sent){
+      try{ fetch(API, { method:'POST', headers:{'Content-Type':'application/json'}, body, keepalive:true }).catch(()=>{}); }catch(e){}
+    }
+    unsaved = false;
   }
 
   function personColorVar(p){ return p==='완수' ? 'var(--bf)' : 'var(--heesu)'; }
@@ -860,12 +881,23 @@
   }, 60000);
 
   document.addEventListener('visibilitychange', async ()=>{
-    if(document.visibilityState==='visible' && loaded){
+    if(document.visibilityState==='hidden'){
+      flushSaveBeacon();
+    } else if(document.visibilityState==='visible' && loaded){
       refreshRealToday();
+      if(unsaved){
+        // 화면을 보기 전에 아직 서버 저장이 확인 안 된 수정사항이 있으면,
+        // 서버 값으로 덮어써서 방금 한 수정을 날리는 대신 먼저 제대로 저장부터 함
+        clearTimeout(saveTimer); saveTimer=null;
+        await doSave();
+        renderCalendar();
+        return;
+      }
       try{ data = await loadRemote(); if(!data.events) data.events=[]; if(!data.dayoff) data.dayoff=[]; renderCalendar(); setSync('ok'); }
       catch(e){ setSync('offline'); }
     }
   });
+  window.addEventListener('pagehide', flushSaveBeacon);
 
   init();
 })();
